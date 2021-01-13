@@ -1,14 +1,28 @@
+## Outline
+
 _I was looking into how Firestore queries data and had the idea of comparing indexes prior to reading documents as a relatively unintensive - O(N) - way of enabling multiple range operators._
 
+_I really enjoy working with Firestore, particularly the triggers and the development environment (emulators, etc), however when filtering across many fields the experience falls short._
+
+_I recognise that this is somewhat processor intensive but I am recommending that this processing occurs client-side._
+
+### Process
+
+1. Each query is run individually
+2. Each query returns a subset of an index structured as a map with the shape `{[doc_id]: true}`
+3. The maps are combined client side with the `combineIndexes` function
+4. A final query is sent to `firestore` with document ids from a collection that should be retrieved
+
 ```javascript
-const compound = db.compound();
-const whereA1 = ["price", ">", 10];
-const whereA2 = ["price", "<", 20];
-const whereB1 = ["rating", ">=", 4.5];
-compound("products", [whereA1, whereA2, whereB1, whereC1]);
+const compound = firestore.compound();
+const wherePriceGt = ["price", ">", 10];
+const wherePriceLt = ["price", "<", 20];
+const whereRating = ["rating", ">=", 4.5];
+const whereDistance = ["distance", "<", 50];
+compound("products", [wherePriceGt, wherePriceLt, whereRating, whereDistance]);
 ```
 
-- Run `whereA1` & `whereA2` as they are the same field (`price`) only reading the index and delaying reading the documents themselves.
+- Run `wherePriceGt` & `wherePriceLt` as they are the same field (`price`) only reading the index and delaying reading the documents themselves.
 
 | price | doc_id |
 | ----- | ------ |
@@ -26,7 +40,7 @@ const matched_price = {
 };
 ```
 
-- Run `whereB1` as if it is an independent query returning only the index keys that match the query
+- Run `whereRating` as if it is an independent query returning only the index keys that match the query
 
 | rating | doc_id |
 | ------ | ------ |
@@ -44,7 +58,7 @@ const matched_rating = {
 };
 ```
 
-- Run `whereC1` as if it is an independent query returning only the index keys that match the query
+- Run `whereDistance` as if it is an independent query returning only the index keys that match the query
 
 | distance | doc_id |
 | -------- | ------ |
@@ -83,7 +97,3 @@ const result = combineIndexes(matched_price, [
 ```
 
 - Only at this point are the document reads executed
-
-```
-
-```
