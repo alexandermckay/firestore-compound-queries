@@ -6,6 +6,8 @@ _I really enjoy working with Firestore, particularly the triggers and the develo
 
 _I recognise that this is somewhat processor intensive but I am recommending that this processing occurs client-side._
 
+_A basic working example is viewable and runnable in the `example.js` file_
+
 ### Process
 
 1. Each query is run individually
