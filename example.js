@@ -1,8 +1,7 @@
 const faker = require("faker");
-const { gt, gte, lt, lte } = require("ramda");
+const { prop, and, gt, gte, lt, lte, propEq, path, __ } = require("ramda");
 
-// SEED MOCK DATA
-
+// Seed mock data
 const products = {};
 const seedAmount = 10000;
 
@@ -15,8 +14,7 @@ for (let i = 0; i < seedAmount; i++) {
   };
 }
 
-// FUNCTIONS
-
+// Functions
 const operatorMap = {
   ">": gt,
   ">=": gte,
@@ -24,40 +22,51 @@ const operatorMap = {
   "<=": lte,
 };
 
-function createIndexSubset(collection, [key, operatorKey, value]) {
-  const operator = operatorMap[operatorKey];
+function createIndexSubsetServerSide(collection, [key, operatorKey, value]) {
+  const operator = prop(operatorKey, operatorMap);
   let indexSubset = {};
   for (const doc in collection) {
-    if (operator(collection[doc][key], value)) indexSubset[doc] = true;
+    const queryPassed = operator(path([doc, key], collection), value);
+    if (queryPassed) indexSubset[doc] = true;
   }
   return indexSubset;
 }
 
-function combineIndexes(primary, second, third) {
+function combineIndexesClientSide(...indexSubsets) {
   let result = {};
+  let cond;
+  const [primary, second, third] = indexSubsets;
+  const nthQuery = propEq("length", __, indexSubsets);
+  const twoQueries = nthQuery(2);
+  const threeQueries = nthQuery(3);
   for (const property in primary) {
-    if (second[property] && third[property]) result[property] = true;
+    const nth2Prop = prop(property, second);
+    const nth3Prop = prop(property, third);
+    if (twoQueries) cond = nth2Prop;
+    else if (threeQueries) cond = and(nth2Prop, nth3Prop);
+    else throw new Error("Maximum of 3 Ranged queries supported");
+    if (cond) result[property] = true;
   }
   return result;
 }
 
-// MOCK QUERY
-
-const wherePriceGt = ["price", ">", 10];
-const whereRating = ["rating", ">=", 4.5];
-const whereDistance = ["distance", "<", 50];
-
+// Firestore mock
 const firestore = {
   compound: (collection, queries) => {
-    const [priceIndex, ratingIndex, distanceIndex] = queries.map(
-      // createIndexSubset would occur server-side
-      (query) => createIndexSubset(collection, query)
+    const indexSubsets = queries.map(
+      // createIndexSubsetServerSide would occur server-side
+      (query) => createIndexSubsetServerSide(collection, query)
     );
-    // combineIndexes would occur client-side and then a speciality query could return all the docs present in the docIdMap
-    const docIdMap = combineIndexes(priceIndex, ratingIndex, distanceIndex);
+    // combineIndexesClientSide would occur client-side and then a speciality query could return all the docs present in the docIdMap
+    const docIdMap = combineIndexesClientSide(...indexSubsets);
     return docIdMap;
   },
 };
+
+// Mock query
+const wherePriceGt = ["price", ">", 10];
+const whereRating = ["rating", ">=", 4.5];
+const whereDistance = ["distance", "<", 50];
 
 console.log(
   firestore.compound(products, [wherePriceGt, whereRating, whereDistance])
