@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "faker": "^5.1.0",
+    "ramda": "^0.27.1",
     "uuid": "^8.3.2"
   }
 }
